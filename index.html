@@ -3,668 +3,693 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sketch to Life</title>
+  <title>Ingenious One</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+    :root {
+      --ease-luxe: cubic-bezier(0.45, 0, 0.15, 1);
+      --c-bg: #0c1628;
+      --c-text: #f2ede6;
+      --c-muted: rgba(242,237,230,0.65);
+    }
+
     html, body {
       width: 100%; height: 100%;
+      background: var(--c-bg);
+      color: var(--c-text);
       overflow: hidden;
-      font-family: 'Georgia', serif;
-      background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Scene container ── */
-    .scene {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    /* ── SKETCH LAYER (visible at start) ── */
-    .layer-sketch {
-      position: absolute; inset: 0;
-      background: #fafafa;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .layer-sketch svg.flowers {
-      width: 100%;
-      height: 80%;
-      opacity: 1;
-      transition: opacity 0.4s ease;
-    }
-
-    /* ── PHOTO LAYER (revealed by blob clip) ── */
-    .layer-photo {
-      position: absolute; inset: 0;
-      /* Deep blue sky photo simulation */
-      background:
-        radial-gradient(ellipse 60% 40% at 70% 30%, #c8dff5 0%, transparent 60%),
-        radial-gradient(ellipse 40% 30% at 20% 20%, #d4e8f7 0%, transparent 55%),
-        linear-gradient(175deg, #1a3a6b 0%, #2155a3 35%, #3370c4 60%, #1e3d7a 100%);
-      clip-path: url(#blob-clip);
-    }
-
-    /* Flowers photo texture overlay */
-    .layer-photo::after {
-      content: '';
-      position: absolute; inset: 0;
-      background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>") center/cover;
-      opacity: 0.15;
-    }
-
-    /* Daisy flowers in color */
-    .layer-photo .flowers-color {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 75%;
-    }
-
-    /* ── BLOB SVG CLIP-PATH ── */
-    #clip-svg {
+    /* ── SVG mask defs ─────────────────────────────────────────── */
+    #svg-defs {
       position: absolute;
       width: 0; height: 0;
       overflow: hidden;
+      pointer-events: none;
     }
 
-    /* ── WEBSITE UI (fades in at end) ── */
-    .layer-ui {
-      position: absolute; inset: 0;
-      opacity: 0;
-      transition: opacity 0.8s ease 0.3s;
+    /* ── Preloader ─────────────────────────────────────────────── */
+    #preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: var(--c-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       pointer-events: none;
+    }
+
+    .loader-ring {
+      width: 32px; height: 32px;
+      border: 1.5px solid rgba(242,237,230,0.15);
+      border-top-color: rgba(242,237,230,0.6);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Hero ───────────────────────────────────────────────────── */
+    #hero {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    /* Background wrapper — this is what gets blob-masked */
+    #hero-bg-wrapper {
+      position: absolute;
+      inset: 0;
+      will-change: transform, opacity, filter;
+      /* mask applied via JS for reliability */
+    }
+
+    #hero-bg {
+      position: absolute;
+      inset: -4%;          /* slight overflow so scale anim doesn't show edges */
+      background:
+        radial-gradient(ellipse 55% 45% at 65% 28%, #1d4580 0%, transparent 65%),
+        radial-gradient(ellipse 35% 30% at 18% 22%, #253f7a 0%, transparent 55%),
+        radial-gradient(ellipse 70% 50% at 50% 80%, #0a1525 0%, transparent 70%),
+        linear-gradient(168deg, #0f2050 0%, #1a3d8f 40%, #2255b0 65%, #0d1e4a 100%);
+      will-change: transform, filter, opacity;
+      transform-origin: center center;
+    }
+
+    /* Daisy flowers (SVG, positioned at bottom of bg) */
+    #hero-flowers {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 72%;
+      pointer-events: none;
+    }
+
+    /* Subtle vignette */
+    #hero-bg-wrapper::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 90% 90% at 50% 50%, transparent 40%, rgba(8,14,28,0.55) 100%);
+      pointer-events: none;
+    }
+
+    /* Cloud wisps */
+    .cloud {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+      filter: blur(40px);
+      pointer-events: none;
+    }
+    .cloud-1 { width: 340px; height: 120px; top: 18%; left: 52%; }
+    .cloud-2 { width: 220px; height: 90px;  top: 24%; left: 30%; }
+    .cloud-3 { width: 180px; height: 70px;  top: 10%; left: 70%; }
+
+    /* ── Overlay: nav + text (NOT masked) ────────────────────────── */
+    #hero-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
       display: flex;
       flex-direction: column;
     }
-    .layer-ui.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
 
+    /* Navigation */
     nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 40px;
-      background: rgba(255,255,255,0.08);
-      backdrop-filter: blur(8px);
-    }
-    .nav-logo {
-      color: #fff;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      opacity: 0.9;
-    }
-    .nav-links {
-      display: flex;
-      gap: 32px;
-      list-style: none;
-    }
-    .nav-links a {
-      color: rgba(255,255,255,0.85);
-      text-decoration: none;
-      font-size: 13px;
-      letter-spacing: 0.04em;
-    }
-    .nav-cta {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.4);
-      color: #fff;
-      padding: 8px 18px;
-      border-radius: 4px;
-      font-size: 13px;
-      cursor: pointer;
-      backdrop-filter: blur(4px);
+      padding: 22px 48px;
+      backdrop-filter: blur(0px);
     }
 
-    .hero-text {
+    @media (max-width: 600px) {
+      nav { padding: 18px 24px; }
+    }
+
+    .nav-logo {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--c-text);
+      opacity: 0.9;
+      will-change: transform, opacity;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 36px;
+      list-style: none;
+    }
+
+    @media (max-width: 600px) { .nav-links { display: none; } }
+
+    .nav-links a {
+      color: var(--c-muted);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      transition: color 0.25s;
+      will-change: transform, opacity;
+    }
+    .nav-links a:hover { color: var(--c-text); }
+
+    .nav-cta {
+      border: 1px solid rgba(242,237,230,0.35);
+      background: rgba(242,237,230,0.07);
+      color: var(--c-text);
+      padding: 9px 20px;
+      border-radius: 3px;
+      font-size: 11.5px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.25s, border-color 0.25s;
+      will-change: transform, opacity;
+    }
+    .nav-cta:hover { background: rgba(242,237,230,0.14); border-color: rgba(242,237,230,0.55); }
+
+    /* Hero text */
+    .hero-content {
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 0 40px;
-      max-width: 560px;
-      margin-left: 40px;
-    }
-    .hero-text h1 {
-      font-size: clamp(32px, 4vw, 52px);
-      color: #fff;
-      font-weight: 400;
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-    .hero-text h1 em {
-      font-style: italic;
-      font-weight: 300;
-    }
-    .hero-text p {
-      color: rgba(255,255,255,0.75);
-      font-size: 14px;
-      margin-bottom: 28px;
-      font-family: sans-serif;
-      letter-spacing: 0.02em;
-    }
-    .hero-btns {
-      display: flex;
-      gap: 12px;
-    }
-    .btn-outline {
-      border: 1px solid rgba(255,255,255,0.5);
-      color: #fff;
-      background: transparent;
-      padding: 10px 22px;
-      border-radius: 4px;
-      font-size: 13px;
-      cursor: pointer;
-      font-family: sans-serif;
-    }
-    .btn-solid {
-      background: rgba(255,255,255,0.18);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: #fff;
-      padding: 10px 22px;
-      border-radius: 4px;
-      font-size: 13px;
-      cursor: pointer;
-      font-family: sans-serif;
-      backdrop-filter: blur(6px);
+      padding: 0 48px 80px;
+      max-width: 680px;
     }
 
-    /* ── CROSS-STITCH / TEXTURE overlay on photo ── */
-    .texture-overlay {
-      position: absolute; inset: 0;
-      pointer-events: none;
-      clip-path: url(#blob-clip);
+    @media (max-width: 600px) {
+      .hero-content { padding: 0 24px 60px; }
     }
-    .texture-overlay canvas {
-      width: 100%; height: 100%;
+
+    .hero-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--c-muted);
+      margin-bottom: 20px;
+      will-change: transform, opacity;
+    }
+
+    .hero-headline {
+      font-family: Georgia, 'Times New Roman', 'Book Antiqua', serif;
+      font-size: clamp(38px, 5.5vw, 68px);
+      font-weight: 400;
+      line-height: 1.12;
+      color: var(--c-text);
+      letter-spacing: -0.01em;
+      margin-bottom: 22px;
+      will-change: transform, opacity;
+    }
+
+    .hero-headline em {
+      font-style: italic;
+      font-weight: 300;
+      color: rgba(242,237,230,0.82);
+    }
+
+    .hero-description {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--c-muted);
+      max-width: 420px;
+      margin-bottom: 36px;
+      letter-spacing: 0.01em;
+      will-change: transform, opacity;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      will-change: transform, opacity;
+    }
+
+    .btn {
+      padding: 13px 28px;
+      border-radius: 3px;
+      font-size: 12px;
+      letter-spacing: 0.09em;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .btn-primary {
+      background: rgba(242,237,230,0.12);
+      border: 1px solid rgba(242,237,230,0.28);
+      color: var(--c-text);
+    }
+    .btn-primary:hover { background: rgba(242,237,230,0.2); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(242,237,230,0.22);
+      color: var(--c-muted);
+    }
+    .btn-ghost:hover { border-color: rgba(242,237,230,0.45); color: var(--c-text); }
+
+    /* ── Reduced motion ─────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      #preloader { display: none; }
+      #hero-bg-wrapper { -webkit-mask: none !important; mask: none !important; }
+      #hero-bg { transform: none !important; filter: none !important; opacity: 1 !important; }
+      .anim-el { transform: none !important; opacity: 1 !important; }
+      .loader-ring { animation: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- Hidden SVG clip path definition -->
-<svg id="clip-svg" xmlns="http://www.w3.org/2000/svg">
+<!-- ── SVG mask & filter definitions ──────────────────────────────────── -->
+<svg id="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <clipPath id="blob-clip" clipPathUnits="userSpaceOnUse">
-      <path id="blob-path" d="M0,0"/>
-    </clipPath>
+
+    <!--
+      Blob filter: turbulence displaces the circle for organic edges,
+      then Gaussian blur feathers those edges for the atmospheric reveal.
+    -->
+    <filter id="blob-filter" x="-40%" y="-40%" width="180%" height="180%"
+            color-interpolation-filters="linearRGB">
+
+      <!-- Organic turbulence noise -->
+      <feTurbulence
+        id="ft-noise"
+        type="turbulence"
+        baseFrequency="0.016 0.011"
+        numOctaves="3"
+        seed="14"
+        result="noise"
+      />
+
+      <!-- Displace circle edges with noise → organic blob shape -->
+      <feDisplacementMap
+        id="ft-displace"
+        in="SourceGraphic"
+        in2="noise"
+        scale="72"
+        xChannelSelector="R"
+        yChannelSelector="G"
+        result="displaced"
+      />
+
+      <!-- Blur the displaced result → soft atmospheric feathering -->
+      <feGaussianBlur
+        id="ft-blur"
+        in="displaced"
+        stdDeviation="26"
+        result="soft"
+      />
+
+    </filter>
+
+    <!--
+      The mask: a white circle (with blob filter) that grows from r=0.
+      The hero bg is only visible through this white region.
+    -->
+    <mask id="reveal-mask" maskUnits="userSpaceOnUse">
+      <rect id="mask-bg" x="0" y="0" width="100%" height="100%" fill="black"/>
+      <circle
+        id="reveal-circle"
+        cx="0" cy="0" r="0"
+        fill="white"
+        filter="url(#blob-filter)"
+      />
+    </mask>
+
   </defs>
 </svg>
 
-<div class="scene">
+<!-- ── Preloader ──────────────────────────────────────────────────────── -->
+<div id="preloader" role="status" aria-label="Loading">
+  <div class="loader-ring"></div>
+</div>
 
-  <!-- LAYER 1: Sketch -->
-  <div class="layer-sketch" id="sketchLayer">
-    <svg class="flowers" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg">
-      <style>
-        .sk { fill: none; stroke: #1a1a1a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-        .sk-fill { fill: #f8f8f8; stroke: #1a1a1a; stroke-width: 1.8; }
-      </style>
-      <!-- Daisy 1 - large left -->
-      <g transform="translate(120,520) rotate(-8)">
-        <line class="sk" x1="0" y1="0" x2="-10" y2="-220"/>
-        <g transform="translate(-10,-220)">
-          <!-- petals -->
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-32" rx="7" ry="22" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="18"/>
-        </g>
-        <!-- leaf -->
-        <ellipse class="sk" cx="-18" cy="-100" rx="14" ry="28" transform="translate(-18,-100) rotate(-40) translate(18,100)"/>
-      </g>
-      <!-- Daisy 2 -->
-      <g transform="translate(250,560) rotate(5)">
-        <line class="sk" x1="0" y1="0" x2="5" y2="-190"/>
-        <g transform="translate(5,-190)">
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-28" rx="6" ry="19" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="15"/>
-        </g>
-      </g>
-      <!-- Daisy 3 - tall center-left -->
-      <g transform="translate(400,580) rotate(-3)">
-        <line class="sk" x1="0" y1="0" x2="8" y2="-260"/>
-        <g transform="translate(8,-260)">
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-35" rx="8" ry="25" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="20"/>
-        </g>
-        <ellipse class="sk" cx="16" cy="-140" rx="16" ry="30" transform="translate(16,-140) rotate(-35) translate(-16,140)"/>
-      </g>
-      <!-- Daisy 4 center -->
-      <g transform="translate(560,550) rotate(4)">
-        <line class="sk" x1="0" y1="0" x2="-5" y2="-210"/>
-        <g transform="translate(-5,-210)">
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-30" rx="7" ry="21" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="17"/>
-        </g>
-      </g>
-      <!-- Daisy 5 right-center -->
-      <g transform="translate(750,570) rotate(-6)">
-        <line class="sk" x1="0" y1="0" x2="12" y2="-240"/>
-        <g transform="translate(12,-240)">
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-33" rx="7" ry="23" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="19"/>
-        </g>
-        <ellipse class="sk" cx="-18" cy="-110" rx="15" ry="28" transform="translate(-18,-110) rotate(38) translate(18,110)"/>
-      </g>
-      <!-- Daisy 6 small right -->
-      <g transform="translate(920,590) rotate(7)">
-        <line class="sk" x1="0" y1="0" x2="-8" y2="-160"/>
-        <g transform="translate(-8,-160)">
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-24" rx="5.5" ry="17" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="13"/>
-        </g>
-      </g>
-      <!-- Daisy 7 far right -->
-      <g transform="translate(1080,560) rotate(-4)">
-        <line class="sk" x1="0" y1="0" x2="6" y2="-200"/>
-        <g transform="translate(6,-200)">
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(0)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(30)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(60)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(90)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(120)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(150)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(180)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(210)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(240)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(270)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(300)"/>
-          <ellipse class="sk-fill" cx="0" cy="-29" rx="6.5" ry="20" transform="rotate(330)"/>
-          <circle class="sk-fill" cx="0" cy="0" r="16"/>
-        </g>
-      </g>
-      <!-- ground/grass hints -->
-      <path class="sk" d="M0,580 Q30,560 60,575 Q90,560 120,572"/>
-      <path class="sk" d="M200,590 Q240,570 270,585"/>
-      <path class="sk" d="M600,580 Q640,560 680,575"/>
-    </svg>
-  </div>
+<!-- ── Hero ───────────────────────────────────────────────────────────── -->
+<section id="hero" aria-label="Hero">
 
-  <!-- LAYER 2: Color photo (clipped by blob) -->
-  <div class="layer-photo" id="photoLayer">
-    <!-- Color daisies SVG -->
-    <svg class="flowers-color" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax meet"
-         style="position:absolute;bottom:0;left:0;width:100%;height:75%"
-         xmlns="http://www.w3.org/2000/svg">
+  <!-- Background (receives blob mask) -->
+  <div id="hero-bg-wrapper">
+    <div id="hero-bg"></div>
+
+    <!-- Daisy flower illustration -->
+    <svg id="hero-flowers" viewBox="0 0 1200 560"
+         preserveAspectRatio="xMidYMax meet"
+         xmlns="http://www.w3.org/2000/svg"
+         aria-hidden="true">
+      <defs>
+        <radialGradient id="daisy-shadow" cx="50%" cy="100%" r="50%">
+          <stop offset="0%" stop-color="rgba(0,0,0,0.35)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+        </radialGradient>
+      </defs>
       <style>
-        .stem { fill: none; stroke: #4a7c3f; stroke-width: 4; stroke-linecap: round; }
-        .petal { fill: #f0f0f0; stroke: #ddd; stroke-width: 0.5; }
-        .center { fill: #d4820a; stroke: #9c5e05; stroke-width: 1; }
-        .leaf { fill: #4a7c3f; stroke: #3a6230; stroke-width: 1; }
-        .shadow-petal { fill: #e8e4d0; }
+        .st { fill: none; stroke: #4e8c42; stroke-width: 3.5; stroke-linecap: round; }
+        .pt { fill: #f5f2e8; }
+        .pt-s { fill: #e9e4d4; }
+        .ct { fill: #d4820a; stroke: #a06008; stroke-width: 1; }
+        .lf { fill: #4e8c42; }
       </style>
-      <!-- Daisy 1 -->
-      <g transform="translate(120,520) rotate(-8)">
-        <line class="stem" x1="0" y1="0" x2="-10" y2="-220"/>
-        <g transform="translate(-10,-220)">
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-32" rx="9" ry="24" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="20"/>
+
+      <!-- Shadow ground layer -->
+      <ellipse cx="600" cy="555" rx="580" ry="18" fill="url(#daisy-shadow)" opacity="0.5"/>
+
+      <!-- Daisy 1 – large, far left -->
+      <g transform="translate(88,555) rotate(-9)">
+        <line class="st" x1="0" y1="0" x2="-14" y2="-235"/>
+        <ellipse class="lf" cx="-44" cy="-118" rx="16" ry="32"
+                 transform="translate(-44,-118) rotate(-42) translate(44,118)"/>
+        <g transform="translate(-14,-235)">
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(27)"/>
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(54)"/>
+          <ellipse class="pt-s" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(81)"/>
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(108)"/>
+          <ellipse class="pt-s" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(135)"/>
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(162)"/>
+          <ellipse class="pt-s" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(189)"/>
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(216)"/>
+          <ellipse class="pt-s" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(243)"/>
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(270)"/>
+          <ellipse class="pt-s" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(297)"/>
+          <ellipse class="pt" cx="0" cy="-37" rx="9.5" ry="26" transform="rotate(324)"/>
+          <circle class="ct" cx="0" cy="0" r="22"/>
         </g>
-        <ellipse class="leaf" cx="-18" cy="-100" rx="14" ry="28" transform="translate(-18,-100) rotate(-40) translate(18,100)"/>
       </g>
+
       <!-- Daisy 2 -->
-      <g transform="translate(250,560) rotate(5)">
-        <line class="stem" x1="0" y1="0" x2="5" y2="-190"/>
-        <g transform="translate(5,-190)">
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-28" rx="8" ry="21" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="17"/>
+      <g transform="translate(220,560) rotate(6)">
+        <line class="st" x1="0" y1="0" x2="8" y2="-195"/>
+        <g transform="translate(8,-195)">
+          <ellipse class="pt" cx="0" cy="-31" rx="8" ry="22" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-31" rx="8" ry="22" transform="rotate(30)"/>
+          <ellipse class="pt" cx="0" cy="-31" rx="8" ry="22" transform="rotate(60)"/>
+          <ellipse class="pt-s" cx="0" cy="-31" rx="8" ry="22" transform="rotate(90)"/>
+          <ellipse class="pt" cx="0" cy="-31" rx="8" ry="22" transform="rotate(120)"/>
+          <ellipse class="pt-s" cx="0" cy="-31" rx="8" ry="22" transform="rotate(150)"/>
+          <ellipse class="pt" cx="0" cy="-31" rx="8" ry="22" transform="rotate(180)"/>
+          <ellipse class="pt-s" cx="0" cy="-31" rx="8" ry="22" transform="rotate(210)"/>
+          <ellipse class="pt" cx="0" cy="-31" rx="8" ry="22" transform="rotate(240)"/>
+          <ellipse class="pt-s" cx="0" cy="-31" rx="8" ry="22" transform="rotate(270)"/>
+          <ellipse class="pt" cx="0" cy="-31" rx="8" ry="22" transform="rotate(300)"/>
+          <ellipse class="pt-s" cx="0" cy="-31" rx="8" ry="22" transform="rotate(330)"/>
+          <circle class="ct" cx="0" cy="0" r="17"/>
         </g>
       </g>
-      <!-- Daisy 3 -->
-      <g transform="translate(400,580) rotate(-3)">
-        <line class="stem" x1="0" y1="0" x2="8" y2="-260"/>
-        <g transform="translate(8,-260)">
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-35" rx="10" ry="27" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="22"/>
-        </g>
-        <ellipse class="leaf" cx="16" cy="-140" rx="16" ry="30" transform="translate(16,-140) rotate(-35) translate(-16,140)"/>
-      </g>
-      <!-- Daisy 4 -->
-      <g transform="translate(560,550) rotate(4)">
-        <line class="stem" x1="0" y1="0" x2="-5" y2="-210"/>
-        <g transform="translate(-5,-210)">
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-30" rx="9" ry="23" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="19"/>
+
+      <!-- Daisy 3 – tallest, center-left -->
+      <g transform="translate(390,558) rotate(-4)">
+        <line class="st" x1="0" y1="0" x2="10" y2="-270"/>
+        <ellipse class="lf" cx="28" cy="-145" rx="18" ry="34"
+                 transform="translate(28,-145) rotate(-32) translate(-28,145)"/>
+        <g transform="translate(10,-270)">
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(25.7)"/>
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(51.4)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(77.1)"/>
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(102.8)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(128.5)"/>
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(154.2)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(180)"/>
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(205.7)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(231.4)"/>
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(257.1)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(282.8)"/>
+          <ellipse class="pt" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(308.5)"/>
+          <ellipse class="pt-s" cx="0" cy="-40" rx="10.5" ry="28" transform="rotate(334.2)"/>
+          <circle class="ct" cx="0" cy="0" r="24"/>
         </g>
       </g>
+
+      <!-- Daisy 4 – center -->
+      <g transform="translate(560,562) rotate(5)">
+        <line class="st" x1="0" y1="0" x2="-6" y2="-218"/>
+        <g transform="translate(-6,-218)">
+          <ellipse class="pt" cx="0" cy="-33" rx="9" ry="23" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-33" rx="9" ry="23" transform="rotate(30)"/>
+          <ellipse class="pt" cx="0" cy="-33" rx="9" ry="23" transform="rotate(60)"/>
+          <ellipse class="pt-s" cx="0" cy="-33" rx="9" ry="23" transform="rotate(90)"/>
+          <ellipse class="pt" cx="0" cy="-33" rx="9" ry="23" transform="rotate(120)"/>
+          <ellipse class="pt-s" cx="0" cy="-33" rx="9" ry="23" transform="rotate(150)"/>
+          <ellipse class="pt" cx="0" cy="-33" rx="9" ry="23" transform="rotate(180)"/>
+          <ellipse class="pt-s" cx="0" cy="-33" rx="9" ry="23" transform="rotate(210)"/>
+          <ellipse class="pt" cx="0" cy="-33" rx="9" ry="23" transform="rotate(240)"/>
+          <ellipse class="pt-s" cx="0" cy="-33" rx="9" ry="23" transform="rotate(270)"/>
+          <ellipse class="pt" cx="0" cy="-33" rx="9" ry="23" transform="rotate(300)"/>
+          <ellipse class="pt-s" cx="0" cy="-33" rx="9" ry="23" transform="rotate(330)"/>
+          <circle class="ct" cx="0" cy="0" r="19"/>
+        </g>
+      </g>
+
       <!-- Daisy 5 -->
-      <g transform="translate(750,570) rotate(-6)">
-        <line class="stem" x1="0" y1="0" x2="12" y2="-240"/>
-        <g transform="translate(12,-240)">
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-33" rx="9" ry="25" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="21"/>
+      <g transform="translate(740,556) rotate(-5)">
+        <line class="st" x1="0" y1="0" x2="14" y2="-245"/>
+        <ellipse class="lf" cx="-20" cy="-120" rx="15" ry="30"
+                 transform="translate(-20,-120) rotate(40) translate(20,120)"/>
+        <g transform="translate(14,-245)">
+          <ellipse class="pt" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(30)"/>
+          <ellipse class="pt" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(60)"/>
+          <ellipse class="pt-s" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(90)"/>
+          <ellipse class="pt" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(120)"/>
+          <ellipse class="pt-s" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(150)"/>
+          <ellipse class="pt" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(180)"/>
+          <ellipse class="pt-s" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(210)"/>
+          <ellipse class="pt" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(240)"/>
+          <ellipse class="pt-s" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(270)"/>
+          <ellipse class="pt" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(300)"/>
+          <ellipse class="pt-s" cx="0" cy="-36" rx="9.5" ry="25" transform="rotate(330)"/>
+          <circle class="ct" cx="0" cy="0" r="21"/>
         </g>
-        <ellipse class="leaf" cx="-18" cy="-110" rx="15" ry="28" transform="translate(-18,-110) rotate(38) translate(18,110)"/>
       </g>
+
       <!-- Daisy 6 -->
-      <g transform="translate(920,590) rotate(7)">
-        <line class="stem" x1="0" y1="0" x2="-8" y2="-160"/>
-        <g transform="translate(-8,-160)">
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-24" rx="7" ry="19" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="15"/>
+      <g transform="translate(900,564) rotate(8)">
+        <line class="st" x1="0" y1="0" x2="-10" y2="-168"/>
+        <g transform="translate(-10,-168)">
+          <ellipse class="pt" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(30)"/>
+          <ellipse class="pt" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(60)"/>
+          <ellipse class="pt-s" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(90)"/>
+          <ellipse class="pt" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(120)"/>
+          <ellipse class="pt-s" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(150)"/>
+          <ellipse class="pt" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(180)"/>
+          <ellipse class="pt-s" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(210)"/>
+          <ellipse class="pt" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(240)"/>
+          <ellipse class="pt-s" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(270)"/>
+          <ellipse class="pt" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(300)"/>
+          <ellipse class="pt-s" cx="0" cy="-27" rx="7.5" ry="20" transform="rotate(330)"/>
+          <circle class="ct" cx="0" cy="0" r="15"/>
         </g>
       </g>
-      <!-- Daisy 7 -->
-      <g transform="translate(1080,560) rotate(-4)">
-        <line class="stem" x1="0" y1="0" x2="6" y2="-200"/>
-        <g transform="translate(6,-200)">
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(0)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(30)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(60)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(90)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(120)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(150)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(180)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(210)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(240)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(270)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(300)"/>
-          <ellipse class="petal" cx="0" cy="-29" rx="8.5" ry="22" transform="rotate(330)"/>
-          <circle class="center" cx="0" cy="0" r="18"/>
+
+      <!-- Daisy 7 – far right -->
+      <g transform="translate(1080,558) rotate(-3)">
+        <line class="st" x1="0" y1="0" x2="8" y2="-208"/>
+        <g transform="translate(8,-208)">
+          <ellipse class="pt" cx="0" cy="-32" rx="9" ry="22" transform="rotate(0)"/>
+          <ellipse class="pt-s" cx="0" cy="-32" rx="9" ry="22" transform="rotate(30)"/>
+          <ellipse class="pt" cx="0" cy="-32" rx="9" ry="22" transform="rotate(60)"/>
+          <ellipse class="pt-s" cx="0" cy="-32" rx="9" ry="22" transform="rotate(90)"/>
+          <ellipse class="pt" cx="0" cy="-32" rx="9" ry="22" transform="rotate(120)"/>
+          <ellipse class="pt-s" cx="0" cy="-32" rx="9" ry="22" transform="rotate(150)"/>
+          <ellipse class="pt" cx="0" cy="-32" rx="9" ry="22" transform="rotate(180)"/>
+          <ellipse class="pt-s" cx="0" cy="-32" rx="9" ry="22" transform="rotate(210)"/>
+          <ellipse class="pt" cx="0" cy="-32" rx="9" ry="22" transform="rotate(240)"/>
+          <ellipse class="pt-s" cx="0" cy="-32" rx="9" ry="22" transform="rotate(270)"/>
+          <ellipse class="pt" cx="0" cy="-32" rx="9" ry="22" transform="rotate(300)"/>
+          <ellipse class="pt-s" cx="0" cy="-32" rx="9" ry="22" transform="rotate(330)"/>
+          <circle class="ct" cx="0" cy="0" r="18"/>
         </g>
       </g>
     </svg>
-  </div>
 
-  <!-- LAYER 3: Website UI -->
-  <div class="layer-ui" id="uiLayer">
+    <!-- Cloud wisps -->
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+    <div class="cloud cloud-3"></div>
+  </div><!-- /hero-bg-wrapper -->
+
+  <!-- UI overlay (nav + text) — NOT masked, animates separately -->
+  <div id="hero-overlay">
     <nav>
-      <div class="nav-logo">Ingenious One</div>
+      <div class="nav-logo anim-el" data-delay="0">Ingenious One</div>
       <ul class="nav-links">
-        <li><a href="#">Works</a></li>
-        <li><a href="#">Services</a></li>
-        <li><a href="#">Pricing</a></li>
+        <li><a href="#" class="anim-el" data-delay="1">Works</a></li>
+        <li><a href="#" class="anim-el" data-delay="2">Services</a></li>
+        <li><a href="#" class="anim-el" data-delay="3">Pricing</a></li>
       </ul>
-      <button class="nav-cta">Book A Call</button>
+      <button class="nav-cta anim-el" data-delay="4">Book A Call</button>
     </nav>
-    <div class="hero-text">
-      <h1>Turning raw <em>sketches</em><br>into <em>living</em> realities.</h1>
-      <p>Premium web services for modern brands.</p>
-      <div class="hero-btns">
-        <button class="btn-outline">See Works</button>
-        <button class="btn-solid">Book A Call</button>
+
+    <div class="hero-content">
+      <p class="hero-eyebrow anim-el" data-delay="5">Premium Web Services</p>
+      <h1 class="hero-headline anim-el" data-delay="6">
+        Turning raw <em>sketches</em><br>into <em>living</em> realities.
+      </h1>
+      <p class="hero-description anim-el" data-delay="7">
+        We craft bespoke digital experiences for modern brands that demand<br>
+        the intersection of craft, clarity, and quiet ambition.
+      </p>
+      <div class="hero-cta anim-el" data-delay="8">
+        <button class="btn btn-primary">See Works</button>
+        <button class="btn btn-ghost">Book A Call</button>
       </div>
     </div>
   </div>
 
-</div>
+</section>
+
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+        integrity="sha512-7eHRwcbYkK4d9d/6tD8X8U9445qRVeknRFx9hFmK55/XhFlFPCfzJDJLZ6t9S8CjuB8Q3COdVMFVT6AoRYJXg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <script>
-// ── Organic blob morph animation ──────────────────────────────────────────────
+(function () {
 
-const W = window.innerWidth;
-const H = window.innerHeight;
-
-// Origin point (center-right area where blob starts in original video)
-const OX = W * 0.58;
-const OY = H * 0.38;
-
-// Blob shape: defined by N control points on a roughly circular path
-// Each point has a base radius and a "noise" offset for organic look
-const N = 18; // number of control points
-
-// Pre-generate random bumps for each control point
-const bumps = Array.from({length: N}, (_, i) => ({
-  base: 1.0,
-  noise: (Math.random() - 0.5) * 0.4,
-  noise2: (Math.random() - 0.5) * 0.25,
-}));
-
-function blobPath(cx, cy, r, t) {
-  // t = 0..1 animation progress (controls size)
-  // Returns an SVG path string for the blob in screen coords
-  const points = [];
-  for (let i = 0; i < N; i++) {
-    const angle = (i / N) * Math.PI * 2 - Math.PI / 2;
-    const b = bumps[i];
-    // Organic wobble that evolves slightly with time
-    const wobble = b.base + b.noise * Math.sin(t * 3 + i * 1.2) + b.noise2 * Math.cos(t * 5 + i * 0.9);
-    // Stretch horizontally to match the video's wider ink spread
-    const rx = r * wobble * 1.35;
-    const ry = r * wobble * 0.88;
-    const px = cx + Math.cos(angle) * rx;
-    const py = cy + Math.sin(angle) * ry;
-    points.push([px, py]);
+  /* ── Respect prefers-reduced-motion ── */
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) {
+    document.getElementById('preloader').style.display = 'none';
+    document.querySelectorAll('.anim-el').forEach(el => {
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    });
+    return;
   }
 
-  // Build smooth bezier path through points
-  const path = [];
-  for (let i = 0; i < N; i++) {
-    const prev = points[(i - 1 + N) % N];
-    const curr = points[i];
-    const next = points[(i + 1) % N];
-    const nextNext = points[(i + 2) % N];
+  /* ── sessionStorage: only animate once per session ── */
+  const PLAYED_KEY = 'hero_intro_played';
+  const alreadyPlayed = sessionStorage.getItem(PLAYED_KEY);
 
-    if (i === 0) path.push(`M ${curr[0]},${curr[1]}`);
+  /* ── Viewport dimensions ── */
+  const W  = window.innerWidth;
+  const H  = window.innerHeight;
+  const cx = W * 0.5;
+  const cy = H * 0.48;  // slightly above center for cinematic feel
 
-    // Catmull-Rom to cubic bezier
-    const cp1x = curr[0] + (next[0] - prev[0]) / 6;
-    const cp1y = curr[1] + (next[1] - prev[1]) / 6;
-    const cp2x = next[0] - (nextNext[0] - curr[0]) / 6;
-    const cp2y = next[1] - (nextNext[1] - curr[1]) / 6;
-    path.push(`C ${cp1x},${cp1y} ${cp2x},${cp2y} ${next[0]},${next[1]}`);
-  }
-  path.push('Z');
+  /* The circle must grow large enough to cover all four corners */
+  const maxR = Math.sqrt(
+    Math.max(cx, W - cx) ** 2 + Math.max(cy, H - cy) ** 2
+  ) * 1.22;  // extra margin so blur doesn't clip at corners
 
-  // When large enough, also add a full-coverage rect so clip covers edges
-  if (r > Math.max(W, H) * 0.9) {
-    path.push(`M -100,-100 L ${W+100},-100 L ${W+100},${H+100} L -100,${H+100} Z`);
-  }
+  /* ── Set SVG mask dimensions ── */
+  const svgDefs = document.getElementById('svg-defs');
+  svgDefs.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgDefs.setAttribute('width', W);
+  svgDefs.setAttribute('height', H);
 
-  return path.join(' ');
-}
+  const maskBg     = document.getElementById('mask-bg');
+  const revealCirc = document.getElementById('reveal-circle');
+  maskBg.setAttribute('width', W);
+  maskBg.setAttribute('height', H);
+  revealCirc.setAttribute('cx', cx);
+  revealCirc.setAttribute('cy', cy);
 
-const blobPathEl = document.getElementById('blob-path');
-const photoLayer = document.getElementById('photoLayer');
-const uiLayer = document.getElementById('uiLayer');
-const sketchLayer = document.getElementById('sketchLayer');
+  /* ── Apply SVG mask to background wrapper ── */
+  const bgWrapper = document.getElementById('hero-bg-wrapper');
+  bgWrapper.style.webkitMask = 'url(#reveal-mask)';
+  bgWrapper.style.mask       = 'url(#reveal-mask)';
 
-// Update clip-path SVG viewBox to match screen
-const clipSvg = document.getElementById('clip-svg');
+  /* ── Gather animated UI elements (sorted by data-delay) ── */
+  const animEls = Array.from(document.querySelectorAll('.anim-el'))
+    .sort((a, b) => +a.dataset.delay - +b.dataset.delay);
 
-// Animation timeline
-// Phase 1: 0.0 - 0.5s  → nothing (sketch visible, tiny dot appears)
-// Phase 2: 0.5 - 2.5s  → blob grows from dot to full screen
-// Phase 3: 2.5 - 3.5s  → UI fades in
+  /* ── GSAP initial states ── */
+  gsap.set('#hero-bg', {
+    scale: 1.08,
+    opacity: 0,
+    filter: 'blur(16px)',
+    transformOrigin: 'center center',
+  });
+  gsap.set(animEls, { y: 30, opacity: 0 });
 
-const DELAY     = 0.7;  // seconds before blob starts growing
-const GROW_DUR  = 1.9;  // seconds for blob to fill screen
-const UI_DELAY  = 2.4;  // seconds before UI appears
-
-// Max radius to cover entire screen from origin
-const MAX_R = Math.sqrt(
-  Math.max(OX, W - OX) ** 2 + Math.max(OY, H - OY) ** 2
-) * 1.15;
-
-let startTime = null;
-let uiShown = false;
-
-function easeInOut(t) {
-  // Smooth cubic ease in-out, faster in middle
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function animate(ts) {
-  if (!startTime) startTime = ts;
-  const elapsed = (ts - startTime) / 1000; // seconds
-
-  // Blob growth
-  const growProgress = Math.min(1, Math.max(0, (elapsed - DELAY) / GROW_DUR));
-  const easedProgress = easeInOut(growProgress);
-  const currentR = easedProgress * MAX_R;
-
-  if (currentR > 0.5) {
-    const path = blobPath(OX, OY, currentR, elapsed);
-    blobPathEl.setAttribute('d', path);
+  /* ──────────────────────────────────────────────────────────────
+     If user has already seen the intro this session, skip it
+     ────────────────────────────────────────────────────────────── */
+  if (alreadyPlayed) {
+    document.getElementById('preloader').style.display = 'none';
+    revealCirc.setAttribute('r', maxR);
+    bgWrapper.style.webkitMask = 'none';
+    bgWrapper.style.mask       = 'none';
+    gsap.set('#hero-bg', { scale: 1, opacity: 1, filter: 'blur(0px)' });
+    gsap.set(animEls, { y: 0, opacity: 1 });
+    return;
   }
 
-  // Fade out sketch as blob grows (starts fading at 60% coverage)
-  if (growProgress > 0.5) {
-    const fadeT = (growProgress - 0.5) / 0.5;
-    sketchLayer.style.opacity = 1 - fadeT;
-  }
+  /* ──────────────────────────────────────────────────────────────
+     Main cinematic timeline
+     ────────────────────────────────────────────────────────────── */
+  const TOTAL    = 1.9;   // blob expand duration
+  const EASE_LUX = 'power2.inOut';
+  const EASE_OUT = 'power3.out';
 
-  // Show UI
-  if (elapsed >= UI_DELAY && !uiShown) {
-    uiShown = true;
-    uiLayer.classList.add('visible');
-  }
+  const tl = gsap.timeline({
+    onComplete: () => {
+      /* Remove mask after reveal (prevents any clip artefacts) */
+      bgWrapper.style.webkitMask = 'none';
+      bgWrapper.style.mask       = 'none';
+      sessionStorage.setItem(PLAYED_KEY, '1');
+    }
+  });
 
-  if (growProgress < 1 || !uiShown) {
-    requestAnimationFrame(animate);
-  }
-}
+  /* 1. Fade preloader out (while blob begins) */
+  tl.to('#preloader', {
+    opacity: 0,
+    duration: 0.5,
+    ease: 'power1.out',
+    onComplete: () => {
+      document.getElementById('preloader').style.display = 'none';
+    }
+  }, 0);
 
-// Start after a brief pause so user sees the sketch
-setTimeout(() => requestAnimationFrame(animate), 600);
+  /* 2. Blob circle expands from 0 → maxR */
+  tl.to(revealCirc, {
+    attr: { r: maxR },
+    duration: TOTAL,
+    ease: EASE_LUX,
+  }, 0);
 
-// Replay on click
-document.addEventListener('click', () => {
-  if (!uiLayer.classList.contains('visible')) return;
-  // Reset
-  startTime = null;
-  uiShown = false;
-  uiLayer.classList.remove('visible');
-  sketchLayer.style.opacity = '1';
-  blobPathEl.setAttribute('d', 'M0,0');
-  setTimeout(() => requestAnimationFrame(animate), 400);
-});
+  /* 3. During expansion: turbulence settles (high churn → subtle) */
+  tl.to('#ft-displace', {
+    attr: { scale: 22 },
+    duration: TOTAL,
+    ease: 'power1.inOut',
+  }, 0);
+
+  /* 4. Edge blur softens as reveal completes (felt, not seen) */
+  tl.to('#ft-blur', {
+    attr: { stdDeviation: 14 },
+    duration: TOTAL,
+    ease: 'power2.in',
+  }, 0);
+
+  /* 5. Hero background: scale in + unblur + fade in */
+  tl.to('#hero-bg', {
+    scale: 1,
+    opacity: 1,
+    filter: 'blur(0px)',
+    duration: TOTAL * 1.05,
+    ease: EASE_LUX,
+  }, 0);
+
+  /* 6. UI elements stagger in — starts when blob is ~30% expanded */
+  tl.to(animEls, {
+    y: 0,
+    opacity: 1,
+    duration: 0.85,
+    stagger: 0.08,
+    ease: EASE_OUT,
+  }, TOTAL * 0.3);
+
+})();
 </script>
 </body>
 </html>
