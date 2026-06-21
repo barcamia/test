@@ -546,148 +546,214 @@
 
 </section>
 
-<!-- GSAP -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
-        integrity="sha512-7eHRwcbYkK4d9d/6tD8X8U9445qRVeknRFx9hFmK55/XhFlFPCfzJDJLZ6t9S8CjuB8Q3COdVMFVT6AoRYJXg=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
 <script>
 (function () {
 
-  /* ── Respect prefers-reduced-motion ── */
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduced) {
-    document.getElementById('preloader').style.display = 'none';
-    document.querySelectorAll('.anim-el').forEach(el => {
-      el.style.opacity = '1';
-      el.style.transform = 'none';
+  /* ─────────────────────────────────────────────────────────────────
+     Minimal self-contained tween engine — no CDN dependency.
+     Supports: opacity, transform (scale/translateY), filter (blur),
+               SVG attr (r, scale, stdDeviation), callbacks, stagger.
+  ───────────────────────────────────────────────────────────────── */
+
+  // Easing functions
+  const ease = {
+    luxe:    t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2,   // power2.inOut
+    out3:    t => 1 - Math.pow(1-t, 3),                              // power3.out
+    out1:    t => 1 - (1-t),                                         // linear
+    inOut1:  t => t < 0.5 ? 2*t*t : -1+(4-2*t)*t,                  // power1.inOut
+    in2:     t => t*t,                                               // power2.in
+  };
+
+  /* tween(target, props, durationMs, easeFn, delayMs, onComplete)
+     props keys: opacity | translateY | scale | blur | svgR | svgDisplace | svgBlur */
+  function tween(target, props, dur, easeFn, delay, onDone) {
+    if (!target) return;
+    const els = Array.isArray(target) ? target : [target];
+
+    // Read start values
+    els.forEach(el => {
+      if (el._tweenStart) return;
+      const cs = getComputedStyle(el);
+      el._tweenStart = {
+        opacity:     parseFloat(cs.opacity) || 0,
+        translateY:  el._ty  || 0,
+        scale:       el._sc  || 1,
+        blur:        el._bl  || 0,
+      };
     });
-    return;
+
+    const start = performance.now() + (delay || 0);
+
+    function frame(now) {
+      if (now < start) { requestAnimationFrame(frame); return; }
+      const raw = Math.min((now - start) / dur, 1);
+      const t   = easeFn(raw);
+
+      els.forEach(el => {
+        const s = el._tweenStart || {};
+        if ('opacity' in props) {
+          const v = s.opacity + (props.opacity - s.opacity) * t;
+          el.style.opacity = v;
+        }
+        if ('translateY' in props || 'scale' in props) {
+          const ty = ('translateY' in props)
+            ? (s.translateY + (props.translateY - s.translateY) * t) : (el._ty || 0);
+          const sc = ('scale' in props)
+            ? (s.scale + (props.scale - s.scale) * t) : (el._sc || 1);
+          el.style.transform = `translateY(${ty}px) scale(${sc})`;
+          el._ty = ty; el._sc = sc;
+        }
+        if ('blur' in props) {
+          const v = s.blur + (props.blur - s.blur) * t;
+          el.style.filter = `blur(${v}px)`;
+          el._bl = v;
+        }
+        if ('svgR' in props) {
+          const v = (s.svgR||0) + (props.svgR - (s.svgR||0)) * t;
+          el.setAttribute('r', v);
+        }
+        if ('svgDisplace' in props) {
+          const v = (s.svgDisplace||72) + (props.svgDisplace - (s.svgDisplace||72)) * t;
+          el.setAttribute('scale', v);
+        }
+        if ('svgBlur' in props) {
+          const v = (s.svgBlur||26) + (props.svgBlur - (s.svgBlur||26)) * t;
+          el.setAttribute('stdDeviation', v);
+        }
+      });
+
+      if (raw < 1) requestAnimationFrame(frame);
+      else if (onDone) onDone();
+    }
+
+    requestAnimationFrame(frame);
   }
 
-  /* ── sessionStorage: only animate once per session ── */
-  const PLAYED_KEY = 'hero_intro_played';
-  const alreadyPlayed = sessionStorage.getItem(PLAYED_KEY);
+  // Stagger helper
+  function stagger(els, props, dur, easeFn, startDelay, staggerMs) {
+    els.forEach((el, i) => {
+      el._tweenStart = null; // reset so start is read fresh
+      tween(el, props, dur, easeFn, startDelay + i * staggerMs);
+    });
+  }
 
-  /* ── Viewport dimensions ── */
+  /* ── Respect prefers-reduced-motion ── */
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── Viewport ── */
   const W  = window.innerWidth;
   const H  = window.innerHeight;
   const cx = W * 0.5;
-  const cy = H * 0.48;  // slightly above center for cinematic feel
-
-  /* The circle must grow large enough to cover all four corners */
+  const cy = H * 0.48;
   const maxR = Math.sqrt(
-    Math.max(cx, W - cx) ** 2 + Math.max(cy, H - cy) ** 2
-  ) * 1.22;  // extra margin so blur doesn't clip at corners
+    Math.max(cx, W-cx)**2 + Math.max(cy, H-cy)**2
+  ) * 1.22;
 
-  /* ── Set SVG mask dimensions ── */
-  const svgDefs = document.getElementById('svg-defs');
+  /* ── SVG mask setup ── */
+  const svgDefs    = document.getElementById('svg-defs');
+  const maskBg     = document.getElementById('mask-bg');
+  const revealCirc = document.getElementById('reveal-circle');
+  const ftDisplace = document.getElementById('ft-displace');
+  const ftBlur     = document.getElementById('ft-blur');
   svgDefs.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svgDefs.setAttribute('width', W);
   svgDefs.setAttribute('height', H);
-
-  const maskBg     = document.getElementById('mask-bg');
-  const revealCirc = document.getElementById('reveal-circle');
   maskBg.setAttribute('width', W);
   maskBg.setAttribute('height', H);
   revealCirc.setAttribute('cx', cx);
   revealCirc.setAttribute('cy', cy);
 
-  /* ── Apply SVG mask to background wrapper ── */
   const bgWrapper = document.getElementById('hero-bg-wrapper');
-  bgWrapper.style.webkitMask = 'url(#reveal-mask)';
-  bgWrapper.style.mask       = 'url(#reveal-mask)';
+  const heroBg    = document.getElementById('hero-bg');
+  const preloader = document.getElementById('preloader');
 
-  /* ── Gather animated UI elements (sorted by data-delay) ── */
   const animEls = Array.from(document.querySelectorAll('.anim-el'))
     .sort((a, b) => +a.dataset.delay - +b.dataset.delay);
 
-  /* ── GSAP initial states ── */
-  gsap.set('#hero-bg', {
-    scale: 1.08,
-    opacity: 0,
-    filter: 'blur(16px)',
-    transformOrigin: 'center center',
-  });
-  gsap.set(animEls, { y: 30, opacity: 0 });
-
-  /* ──────────────────────────────────────────────────────────────
-     If user has already seen the intro this session, skip it
-     ────────────────────────────────────────────────────────────── */
-  if (alreadyPlayed) {
-    document.getElementById('preloader').style.display = 'none';
-    revealCirc.setAttribute('r', maxR);
+  /* ── Show everything instantly (reduced motion or already played) ── */
+  function showInstant() {
+    preloader.style.display = 'none';
     bgWrapper.style.webkitMask = 'none';
-    bgWrapper.style.mask       = 'none';
-    gsap.set('#hero-bg', { scale: 1, opacity: 1, filter: 'blur(0px)' });
-    gsap.set(animEls, { y: 0, opacity: 1 });
+    bgWrapper.style.mask = 'none';
+    heroBg.style.transform = 'scale(1)';
+    heroBg.style.opacity   = '1';
+    heroBg.style.filter    = 'blur(0px)';
+    animEls.forEach(el => {
+      el.style.opacity   = '1';
+      el.style.transform = 'translateY(0px) scale(1)';
+    });
+  }
+
+  const PLAYED_KEY = 'hero_intro_played';
+
+  if (reduced || sessionStorage.getItem(PLAYED_KEY)) {
+    showInstant();
     return;
   }
 
-  /* ──────────────────────────────────────────────────────────────
-     Main cinematic timeline
-     ────────────────────────────────────────────────────────────── */
-  const TOTAL    = 1.9;   // blob expand duration
-  const EASE_LUX = 'power2.inOut';
-  const EASE_OUT = 'power3.out';
+  /* ── Set initial states ── */
+  heroBg.style.transformOrigin = 'center center';
+  heroBg.style.willChange      = 'transform, opacity, filter';
+  heroBg._sc = 1.08; heroBg._bl = 16;
+  heroBg.style.transform = 'translateY(0px) scale(1.08)';
+  heroBg.style.opacity   = '0';
+  heroBg.style.filter    = 'blur(16px)';
 
-  const tl = gsap.timeline({
-    onComplete: () => {
-      /* Remove mask after reveal (prevents any clip artefacts) */
+  animEls.forEach(el => {
+    el._ty = 30; el._sc = 1;
+    el.style.transform = 'translateY(30px) scale(1)';
+    el.style.opacity   = '0';
+    el.style.willChange = 'transform, opacity';
+  });
+
+  /* ── Apply SVG mask ── */
+  bgWrapper.style.webkitMask = 'url(#reveal-mask)';
+  bgWrapper.style.mask       = 'url(#reveal-mask)';
+
+  /* ── Timeline constants ── */
+  const TOTAL_MS  = 1900;  // blob expand
+  const STAGGER_OFFSET_MS = TOTAL_MS * 0.30; // UI starts at 30% of blob
+
+  /* ── Run animation ── */
+
+  // Fade preloader out
+  preloader.style.opacity = '1';
+  preloader._tweenStart = { opacity: 1 };
+  tween(preloader, { opacity: 0 }, 500, ease.out1, 0, () => {
+    preloader.style.display = 'none';
+  });
+
+  // Blob grows
+  revealCirc._tweenStart = { svgR: 0 };
+  tween(revealCirc, { svgR: maxR }, TOTAL_MS, ease.luxe, 0);
+
+  // Turbulence settles
+  ftDisplace._tweenStart = { svgDisplace: 72 };
+  tween(ftDisplace, { svgDisplace: 22 }, TOTAL_MS, ease.inOut1, 0);
+
+  // Edge blur tightens
+  ftBlur._tweenStart = { svgBlur: 26 };
+  tween(ftBlur, { svgBlur: 14 }, TOTAL_MS, ease.in2, 0);
+
+  // Hero bg: scale in, unblur, fade
+  heroBg._tweenStart = { scale: 1.08, blur: 16, opacity: 0, translateY: 0 };
+  tween(heroBg, { scale: 1, blur: 0, opacity: 1, translateY: 0 }, TOTAL_MS, ease.luxe, 0,
+    () => {
+      // Remove mask once fully revealed
       bgWrapper.style.webkitMask = 'none';
       bgWrapper.style.mask       = 'none';
       sessionStorage.setItem(PLAYED_KEY, '1');
     }
-  });
+  );
 
-  /* 1. Fade preloader out (while blob begins) */
-  tl.to('#preloader', {
-    opacity: 0,
-    duration: 0.5,
-    ease: 'power1.out',
-    onComplete: () => {
-      document.getElementById('preloader').style.display = 'none';
-    }
-  }, 0);
-
-  /* 2. Blob circle expands from 0 → maxR */
-  tl.to(revealCirc, {
-    attr: { r: maxR },
-    duration: TOTAL,
-    ease: EASE_LUX,
-  }, 0);
-
-  /* 3. During expansion: turbulence settles (high churn → subtle) */
-  tl.to('#ft-displace', {
-    attr: { scale: 22 },
-    duration: TOTAL,
-    ease: 'power1.inOut',
-  }, 0);
-
-  /* 4. Edge blur softens as reveal completes (felt, not seen) */
-  tl.to('#ft-blur', {
-    attr: { stdDeviation: 14 },
-    duration: TOTAL,
-    ease: 'power2.in',
-  }, 0);
-
-  /* 5. Hero background: scale in + unblur + fade in */
-  tl.to('#hero-bg', {
-    scale: 1,
-    opacity: 1,
-    filter: 'blur(0px)',
-    duration: TOTAL * 1.05,
-    ease: EASE_LUX,
-  }, 0);
-
-  /* 6. UI elements stagger in — starts when blob is ~30% expanded */
-  tl.to(animEls, {
-    y: 0,
-    opacity: 1,
-    duration: 0.85,
-    stagger: 0.08,
-    ease: EASE_OUT,
-  }, TOTAL * 0.3);
+  // UI elements stagger in
+  animEls.forEach(el => { el._tweenStart = null; });
+  stagger(
+    animEls,
+    { translateY: 0, opacity: 1 },
+    850, ease.out3,
+    STAGGER_OFFSET_MS, 80
+  );
 
 })();
 </script>
